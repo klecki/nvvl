@@ -93,7 +93,8 @@ def get_grid(batchsize, rows, cols, fp16):
 
 
 def tensorboard_image(name, image, iteration, writer):
-    out_im = np.moveaxis(image.data.cpu().numpy(), 0, 2)
+    # Tensorboard expects NHW and handles PIL apparently
+    out_im = image.data.cpu().numpy()
     writer.add_image(name, out_im, iteration)
 
 
