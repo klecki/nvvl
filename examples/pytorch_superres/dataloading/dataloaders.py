@@ -84,7 +84,7 @@ def get_loader(args):
             args.batchsize,
             args.world_size)
 
-        sampler = torch.utils.data.distributed.DistributedSampler(dataset)
+        sampler = torch.utils.data.sampler.SequentialSampler(dataset)
 
         train_loader = DataLoader(
             dataset,
@@ -106,7 +106,7 @@ def get_loader(args):
             args.batchsize,
             args.world_size)
 
-        sampler = torch.utils.data.distributed.DistributedSampler(dataset)
+        sampler = torch.utils.data.sampler.SequentialSampler(dataset)
 
         val_loader = DataLoader(
             dataset,
@@ -128,7 +128,7 @@ def get_loader(args):
             os.path.join(args.root, 'train'),
             batchsize=args.batchsize,
             shuffle=True,
-            distributed=True,
+            distributed=False,
             device_id=args.rank % 8,
             fp16=args.fp16)
 
@@ -141,7 +141,7 @@ def get_loader(args):
             os.path.join(args.root, 'val'),
             batchsize=1,
             shuffle=True,
-            distributed=True,
+            distributed=False,
             device_id=args.rank % 8,
             fp16=args.fp16)
 

@@ -7,7 +7,7 @@ from math import ceil, floor
 from tensorboardX import SummaryWriter
 
 import torch
-import torch.distributed as dist
+# import torch.distributed as dist
 import torch.optim as optim
 import torch.utils.data.distributed
 from torch.multiprocessing import Process
@@ -20,7 +20,7 @@ from model.clr import cyclic_learning_rate
 
 from nvidia.fp16 import FP16_Optimizer
 from nvidia.fp16util import network_to_half
-from nvidia.distributed import DistributedDataParallel
+# from nvidia.distributed import DistributedDataParallel
 
 
 parser = argparse.ArgumentParser()
@@ -79,13 +79,13 @@ def main(args):
     torch.cuda.manual_seed(args.seed + args.rank)
     torch.backends.cudnn.benchmark = True
 
-    log.info('Initializing process group')
-    dist.init_process_group(
-        backend='nccl',
-        init_method='tcp://' + args.ip + ':3567',
-        world_size=args.world_size,
-        rank=args.rank)
-    log.info('Process group initialized')
+    log.info('NOT Initializing process group')
+    # dist.init_process_group(
+    #     backend='nccl',
+    #     init_method='tcp://' + args.ip + ':3567',
+    #     world_size=args.world_size,
+    #     rank=args.rank)
+    log.info('Process group NOT initialized')
 
     log.info("Initializing dataloader...")
     train_loader, train_batches, val_loader, val_batches, sampler = get_loader(args)
@@ -110,14 +110,14 @@ def main(args):
     if args.fp16:
         optimizer = FP16_Optimizer(optimizer, dynamic_loss_scale=True)
 
-    model = DistributedDataParallel(model)
+    # model = DistributedDataParallel(model)
 
     # BEGIN TRAINING
     total_iter = 0
     while total_iter * args.world_size < args.max_iter:
 
         epoch = floor(total_iter / train_batches)
-        if args.loader == 'pytorch':
+        if args.loader == 'pytorch' and args.world_size > 1:
             sampler.set_epoch(epoch)
 
         model.train()
@@ -171,7 +171,7 @@ def main(args):
                 writer.add_scalar('train_loss', loss.item(), total_iter)
 
             log.info('Rank %d, Epoch %d, Iteration %d of %d, loss %.5f' %
-                    (dist.get_rank(), epoch, i+1, train_batches, loss.item()))
+                    (0, epoch, i+1, train_batches, loss.item()))
 
             total_iter += 1
 
@@ -184,7 +184,7 @@ def main(args):
                 compute_timer_avg = compute_timer / samples_per_epoch
                 writer.add_scalar('sample_compute_time', compute_timer_avg, total_iter)
             epoch_loss_avg = total_epoch_loss / train_batches
-            log.info('Rank %d, epoch %d: %.5f' % (dist.get_rank(), epoch, epoch_loss_avg))
+            log.info('Rank %d, epoch %d: %.5f' % (0, epoch, epoch_loss_avg))
 
         model.eval()
         total_loss = 0
@@ -210,8 +210,8 @@ def main(args):
         if args.rank == 0:
             writer.add_scalar('val_loss', loss, total_iter)
             writer.add_scalar('val_psnr', psnr, total_iter)
-        log.info('Rank %d validation loss %.5f' % (dist.get_rank(), loss))
-        log.info('Rank %d validation psnr %.5f' % (dist.get_rank(), psnr))
+        log.info('Rank %d validation loss %.5f' % (0, loss))
+        log.info('Rank %d validation psnr %.5f' % (0, psnr))
 
 if __name__=='__main__':
     main(parser.parse_args())
