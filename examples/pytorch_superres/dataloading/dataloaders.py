@@ -84,7 +84,7 @@ def get_loader(args):
             args.batchsize,
             args.world_size)
 
-        sampler = torch.utils.data.sampler.SequentialSampler(dataset)
+        sampler = torch.utils.data.sampler.RandomSampler(dataset)
 
         train_loader = DataLoader(
             dataset,
@@ -106,7 +106,7 @@ def get_loader(args):
             args.batchsize,
             args.world_size)
 
-        sampler = torch.utils.data.sampler.SequentialSampler(dataset)
+        sampler = torch.utils.data.sampler.RandomSampler(dataset)
 
         val_loader = DataLoader(
             dataset,
@@ -148,9 +148,13 @@ def get_loader(args):
         val_batches = len(val_loader)
 
         sampler = None
+    
+    # elif args.loader == 'DALI':
+
 
     else:
 
         raise ValueError('%s is not a valid option for --loader' % args.loader)
 
+    print(train_loader, train_batches, val_loader, val_batches)
     return train_loader, train_batches, val_loader, val_batches, sampler
