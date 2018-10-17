@@ -20,6 +20,10 @@ from model.clr import cyclic_learning_rate
 
 from nvidia.fp16 import FP16_Optimizer
 from nvidia.fp16util import network_to_half
+# from nvidia.dali import *
+
+import numpy as np
+
 # from nvidia.distributed import DistributedDataParallel
 
 
@@ -73,6 +77,22 @@ def main(args):
     else:
         log.basicConfig(level=log.WARNING)
         writer = None
+
+    # pipe = SimplePipeline(batch_size, 1, 0)
+    # pipe.build()
+    # pipe_out = pipe.run()
+    # print(pipe_out)
+    # print(pipe_out[0].at(0).as_shape())
+    # for i in range(3):
+    #     planar = np.array(pipe_out[0].at(0))[i, ...].squeeze().swapaxes(1, 2).swapaxes(0, 1)
+    #     print(planar.shape)
+
+    #     writer.add_image("Dali", planar, i)
+    # pipe.build()
+    # print(pipe.epoch_size())
+    # we have to extract epoch size from dict:
+    # dali_iterator = pytorch.DALIGenericIterator(pipe, ["data"], list(pipe.epoch_size().values())[0])
+    # print(dali_iterator)
 
     torch.cuda.set_device(args.rank % args.world_size)
     torch.manual_seed(args.seed + args.rank)
@@ -131,13 +151,37 @@ def main(args):
 
         # TRAINING EPOCH LOOP
         for i, inputs in enumerate(train_loader):
+            # print(inputs)
 
             if args.loader == 'NVVL':
                 inputs = inputs['input']
-            else:
+            elif args.loader == 'pytorch':
                 inputs = inputs.cuda(non_blocking=True)
                 if args.fp16:
                     inputs = inputs.half()
+            elif args.loader == 'DALI':
+                # Take optupt from 1st pipeline
+                inputs = inputs[0]
+                # 1st output of pipeline for data category
+                inputs = inputs["data"][0]
+                print("Before", inputs.size())
+                # TODO - transformation - crop, transpose axes, return as floats
+                # NFHWC to NCFHW
+                np_tmp = inputs.numpy().swapaxes(3, 4).swapaxes(2, 3).swapaxes(1, 2).astype(np.float32)
+                np_tmp = np.ascontiguousarray(np_tmp[:, :, :, 14:526, :]) # crop to 512x960
+                inputs = torch.from_numpy(np_tmp)
+                inputs = inputs.cuda(non_blocking=True)
+                print("After", inputs.size())
+                # cpu_tmp = inputs.cpu()
+                # for k in range(args.frames):
+                #     print("CC", cpu_tmp.numpy().shape)
+                #     planar = cpu_tmp.numpy()[0, :, k, :, :].squeeze() / 255.0
+                #     print("BBB", planar.shape)
+                #     writer.add_image("Dali", planar, k)
+            else:
+                raise NotImplementedError
+            
+            print(inputs.size())
 
             if args.timing:
                 torch.cuda.synchronize()

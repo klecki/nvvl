@@ -93,7 +93,7 @@ def get_grid(batchsize, rows, cols, fp16):
 
 
 def tensorboard_image(name, image, iteration, writer):
-    # Tensorboard expects NHW and handles PIL apparently
+    # Tensorboard expects CHW and handles PIL apparently
     out_im = image.data.cpu().numpy()
     writer.add_image(name, out_im, iteration)
 
@@ -107,7 +107,7 @@ class VSRNet(nn.Module):
         self.mi = floor(self.frames / 2)
 
         self.pooling = nn.AvgPool2d(4)
-        self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
+        self.upsample = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=True)
 
         if fp16:
             #from FlowNetSD16 import FlowNetSD
