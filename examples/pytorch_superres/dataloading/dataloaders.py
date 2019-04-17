@@ -10,6 +10,39 @@ from torch.utils.data import DataLoader
 from dataloading.datasets import imageDataset
 import nvvl
 
+
+from nvidia.dali.pipeline import Pipeline
+from nvidia.dali.plugin import pytorch
+import nvidia.dali.ops as ops
+import nvidia.dali.types as types
+
+
+class SimpleSequencePipeline(Pipeline):
+    def __init__(self, batch_size=1, file_root="/data_dir/540p/frames/train", sequence_length=3):
+        super(SimpleSequencePipeline, self).__init__(batch_size, num_threads = 1, device_id = 0, seed = 12)
+        self.input = ops.SequenceReader(file_root = file_root, sequence_length = sequence_length)
+        self.decode = ops.HostDecoder(output_type = types.RGB, decode_sequences=True)
+
+    def define_graph(self):
+        seq, meta = self.input()
+        decoded = self.decode(seq, meta)
+        return decoded
+
+#
+class DaliLoader():
+    def __init__(self, batch_size, file_root, sequence_length):
+        self.pipeline = SimpleSequencePipeline(batch_size, file_root, sequence_length)
+        self.pipeline.build()
+        self.epoch_size = list(self.pipeline.epoch_size().values())[0]
+        self.dali_iterator = pytorch.DALIGenericIterator(self.pipeline, ["data"], self.epoch_size)
+    def __len__(self):
+        # TODO(klecki): is this ok?
+        return self.epoch_size
+
+    def __iter__(self):
+        return self.dali_iterator.__iter__()
+
+
 class NVVL():
     def __init__(self, frames, is_cropped, crop_size, root,
                  batchsize=1, device_id=0,
@@ -84,7 +117,7 @@ def get_loader(args):
             args.batchsize,
             args.world_size)
 
-        sampler = torch.utils.data.distributed.DistributedSampler(dataset)
+        sampler = torch.utils.data.sampler.RandomSampler(dataset)
 
         train_loader = DataLoader(
             dataset,
@@ -106,7 +139,7 @@ def get_loader(args):
             args.batchsize,
             args.world_size)
 
-        sampler = torch.utils.data.distributed.DistributedSampler(dataset)
+        sampler = torch.utils.data.sampler.RandomSampler(dataset)
 
         val_loader = DataLoader(
             dataset,
@@ -128,7 +161,7 @@ def get_loader(args):
             os.path.join(args.root, 'train'),
             batchsize=args.batchsize,
             shuffle=True,
-            distributed=True,
+            distributed=False,
             device_id=args.rank % 8,
             fp16=args.fp16)
 
@@ -141,9 +174,25 @@ def get_loader(args):
             os.path.join(args.root, 'val'),
             batchsize=1,
             shuffle=True,
-            distributed=True,
+            distributed=False,
             device_id=args.rank % 8,
             fp16=args.fp16)
+
+        val_batches = len(val_loader)
+
+        sampler = None
+    
+    elif args.loader == 'DALI':
+
+        train_loader = DaliLoader(args.batchsize, 
+            os.path.join(args.root, 'train'),
+            args.frames)
+
+        train_batches = len(train_loader)
+
+        val_loader = DaliLoader(args.batchsize, 
+            os.path.join(args.root, 'val'),
+            args.frames)
 
         val_batches = len(val_loader)
 
@@ -153,4 +202,5 @@ def get_loader(args):
 
         raise ValueError('%s is not a valid option for --loader' % args.loader)
 
+    print(train_loader, train_batches, val_loader, val_batches)
     return train_loader, train_batches, val_loader, val_batches, sampler

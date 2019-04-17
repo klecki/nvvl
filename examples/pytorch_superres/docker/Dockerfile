@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/pytorch:18.03-py3
+FROM nvcr.io/nvidia/pytorch:18.05-py3
 
 ARG FFMPEG_VERSION=3.4.2
 
@@ -60,6 +60,10 @@ RUN pip install --upgrade cmake && \
     apt-get remove -y pkg-config && \
     apt-get autoremove -y
 
+RUN python -m pip install --upgrade pip
 RUN pip install scikit-image tensorflow tensorboard tensorboardX
+
+COPY nvidia_dali-0.5.0.dev0-12345-cp36-cp36m-manylinux1_x86_64.whl /wheelhouse/nvidia_dali-0.5.0.dev0-12345-cp36-cp36m-manylinux1_x86_64.whl
+RUN pip install /wheelhouse/nvidia_dali-0.5.0.dev0-12345-cp36-cp36m-manylinux1_x86_64.whl
 
 WORKDIR /workspace/examples/pytorch_superres
